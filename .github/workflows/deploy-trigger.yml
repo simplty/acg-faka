@@ -1,0 +1,28 @@
+name: Deploy Trigger
+
+on:
+  push:
+    branches:
+      - nsfe
+
+jobs:
+  trigger-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger deploy webhook
+        env:
+          DEPLOY_WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+          DEPLOY_WEBHOOK_SECRET: ${{ secrets.DEPLOY_WEBHOOK_SECRET }}
+        run: |
+          curl -s -X POST "$DEPLOY_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -H "X-Deploy-Token: $DEPLOY_WEBHOOK_SECRET" \
+            -d "$(cat <<EOF
+          {
+            "repository": "${{ github.repository }}",
+            "branch": "${{ github.ref_name }}",
+            "commit": "${{ github.sha }}",
+            "message": "${{ github.event.head_commit.message }}"
+          }
+          EOF
+          )"
