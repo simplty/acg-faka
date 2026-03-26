@@ -1,0 +1,11 @@
+services:
+  app:
+    container_name: acg-faka
+    build: .
+    ports:
+      - "8080:80"
+    volumes:
+      - .:/var/www/html
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

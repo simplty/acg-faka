@@ -2,3 +2,8 @@
 .htaccess
 .user.ini
 config/database.php
+docker-compose.yml
+runtime/
+kernel/Install/Lock
+config/terms
+assets/cache/
