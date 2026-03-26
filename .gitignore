@@ -7,3 +7,4 @@ runtime/
 kernel/Install/Lock
 config/terms
 assets/cache/
+*.log

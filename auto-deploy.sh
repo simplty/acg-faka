@@ -15,12 +15,17 @@
 #   - 若容器未运行则自动启动
 #
 # 通知: 部署开始、构建、成功、失败均会发送飞书卡片通知
+#
+# 环境变量:
+#   AUTO_DEPLOY_FEISHU_WEBHOOK  飞书机器人 Webhook 地址（必需，未设置则跳过通知）
+#
+# 宝塔 Webhook 调用示例:
+#   AUTO_DEPLOY_FEISHU_WEBHOOK="https://open.feishu.cn/open-apis/bot/v2/hook/xxxxx" bash /path/to/auto-deploy.sh
 # =============================================================================
 
 DEPLOY_DIR="$(cd "$(dirname "$0")" && pwd)"
 BRANCH="nsfe"
 LOG_FILE="$DEPLOY_DIR/deploy.log"
-FEISHU_WEBHOOK="https://open.feishu.cn/open-apis/bot/v2/hook/29779784-8be9-4eac-b010-9e43348bd055"
 
 # 解析参数
 FORCE_REBUILD=false
@@ -40,6 +45,7 @@ log() {
 # 飞书卡片通知
 # 参数: $1=标题 $2=颜色(green/red/orange/blue) $3=内容（支持多行，每行一个字段） $4=底部状态文本
 notify() {
+  [ -z "$AUTO_DEPLOY_FEISHU_WEBHOOK" ] && return 0
   local title="$1" color="$2" content="$3" status="$4"
   local elements=""
 
@@ -57,7 +63,7 @@ notify() {
   # 移除末尾逗号
   elements="${elements%,}"
 
-  curl -s -o /dev/null -X POST "$FEISHU_WEBHOOK" \
+  curl -s -o /dev/null -X POST "$AUTO_DEPLOY_FEISHU_WEBHOOK" \
     -H 'Content-Type: application/json' \
     -d "{
       \"msg_type\": \"interactive\",
@@ -154,11 +160,38 @@ else
   fi
 fi
 
-# ---- 部署成功 ----
-log "部署完成"
-notify "acg-faka 部署成功" "green" \
-  "**分支:** ${BRANCH}
+# ---- 健康检查 ----
+DEPLOY_STAGE="健康检查"
+HEALTH_PORT=$(grep -oP '"\K\d+(?=:80")' "$DEPLOY_DIR/docker-compose.yml" 2>/dev/null || echo "3080")
+HEALTH_URL="http://localhost:${HEALTH_PORT}"
+HEALTH_OK=false
+
+for i in 1 2 3 4 5; do
+  HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$HEALTH_URL" 2>/dev/null || echo "000")
+  if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
+    HEALTH_OK=true
+    break
+  fi
+  log "健康检查第 ${i} 次失败 (HTTP $HTTP_CODE)，等待 3 秒后重试..."
+  sleep 3
+done
+
+if [ "$HEALTH_OK" = true ]; then
+  log "健康检查通过 (HTTP $HTTP_CODE)"
+  notify "acg-faka 部署成功" "green" \
+    "**分支:** ${BRANCH}
 **路径:** ${DEPLOY_DIR}
 **提交:** ${COMMIT_INFO}
+**健康检查:** $HEALTH_URL → HTTP $HTTP_CODE
 **时间:** $(date '+%Y-%m-%d %H:%M:%S')" \
-  "部署完成，服务运行中"
+    "部署完成，服务运行中"
+else
+  log "健康检查失败 (HTTP $HTTP_CODE)"
+  notify "acg-faka 部署警告" "red" \
+    "**分支:** ${BRANCH}
+**路径:** ${DEPLOY_DIR}
+**提交:** ${COMMIT_INFO}
+**健康检查:** $HEALTH_URL → HTTP $HTTP_CODE（5 次重试均失败）
+**时间:** $(date '+%Y-%m-%d %H:%M:%S')" \
+    "部署已完成但服务可能不可用，请检查容器日志"
+fi

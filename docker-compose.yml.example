@@ -3,7 +3,7 @@ services:
     container_name: acg-faka
     build: .
     ports:
-      - "8080:80"
+      - "3080:80"
     volumes:
       - .:/var/www/html
     extra_hosts:
