@@ -77,10 +77,20 @@ notify() {
     }" 2>/dev/null || true
 }
 
+# 执行命令并捕获 stderr，失败时自动触发 on_error
+# 用法: run_cmd <command> [args...]
+run_cmd() {
+  local stderr_output
+  stderr_output=$("$@" 2>&1 1>/dev/null) || {
+    DEPLOY_ERROR="命令 \`$*\` 失败 (exit code: $?): ${stderr_output:-无错误输出}"
+    return 1
+  }
+}
+
 # 错误处理：捕获异常并发送失败通知
 on_error() {
   local exit_code=$?
-  local error_msg="${DEPLOY_ERROR:-未知错误 (exit code: $exit_code)}"
+  local error_msg="${DEPLOY_ERROR:-命令 \`${BASH_COMMAND}\` 失败 (exit code: $exit_code)}"
   log "部署失败: $error_msg"
   notify "acg-faka 部署失败" "red" \
     "**分支:** ${BRANCH}
@@ -107,19 +117,18 @@ notify "acg-faka 开始部署" "blue" \
 
 # ---- 拉取代码 ----
 DEPLOY_STAGE="拉取代码"
-git fetch origin "$BRANCH"
+run_cmd git fetch origin "$BRANCH"
 
 # 记录变更文件列表（用于后续判断）
 CHANGED_FILES=$(git diff HEAD "origin/$BRANCH" --name-only 2>/dev/null || true)
 
 if [ "$FORCE_PULL" = true ]; then
   log "强制覆盖本地代码 (--force-pull)"
-  git reset --hard "origin/$BRANCH"
+  run_cmd git reset --hard "origin/$BRANCH"
 else
-  git merge --ff-only "origin/$BRANCH" || {
+  git merge --ff-only "origin/$BRANCH" 2>/dev/null || {
     DEPLOY_ERROR="快进合并失败，本地有未提交的修改。如需强制覆盖请使用 --force-pull"
-    log "$DEPLOY_ERROR"
-    on_error
+    false
   }
 fi
 
