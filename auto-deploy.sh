@@ -135,6 +135,16 @@ fi
 COMMIT_INFO=$(git log --oneline -1)
 log "代码更新完成: $COMMIT_INFO"
 
+# ---- 配置文件初始化 ----
+DEPLOY_STAGE="配置文件初始化"
+for example_file in config/database.php.example docker-compose.yml.example; do
+  target_file="${example_file%.example}"
+  if [ ! -f "$DEPLOY_DIR/$target_file" ]; then
+    cp "$DEPLOY_DIR/$example_file" "$DEPLOY_DIR/$target_file"
+    log "初始化配置文件: $target_file (从 $example_file 复制)"
+  fi
+done
+
 # ---- Docker 镜像构建 ----
 DEPLOY_STAGE="Docker 构建"
 if [ "$FORCE_REBUILD" = true ]; then
