@@ -6,6 +6,7 @@ services:
       - "3080:80"
     volumes:
       - .:/var/www/html
+      - /dev/null:/var/www/html/.user.ini:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
