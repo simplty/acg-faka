@@ -8,4 +8,6 @@ kernel/Install/Lock
 config/terms
 assets/cache/
 app/Plugin/
+app/Pay/*/
+config/store.php
 *.log
