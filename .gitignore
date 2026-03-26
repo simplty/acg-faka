@@ -7,4 +7,5 @@ runtime/
 kernel/Install/Lock
 config/terms
 assets/cache/
+app/Plugin/
 *.log
